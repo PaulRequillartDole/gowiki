@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-var validPath = regexp.MustCompile("^/(edit|save|view)/([a-zA-Z0-9-_]+)$")
+var validPath = regexp.MustCompile("^/(edit|save|view|delete)/([a-zA-Z0-9-_]+)$")
 
 type Page struct {
 	Title string
@@ -32,10 +32,12 @@ func loadPage(title string) (*Page, error) {
 }
 
 func renderTemplate(w http.ResponseWriter, tmpl string, p *Page) {
-	templates := template.Must(template.ParseFiles(
-		"./templates/_base.tmpl",
-		"./templates/"+tmpl+".tmpl",
-	))
+	var templates = template.Must(template.New(tmpl).Funcs(template.FuncMap{
+		"safeHTML": func(b []byte) template.HTML {
+			return template.HTML(b)
+		},
+	}).ParseFiles("./templates/_base.html", "./templates/"+tmpl+".html"))
+
 	err := templates.ExecuteTemplate(w, "base", p)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -54,10 +56,11 @@ func viewHandler(w http.ResponseWriter, r *http.Request, title string) {
 
 func newHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
-		templates := template.Must(template.ParseFiles(
-			"./templates/_base.tmpl",
-			"./templates/new.tmpl",
-		))
+		var templates = template.Must(template.New("new").Funcs(template.FuncMap{
+			"safeHTML": func(b []byte) template.HTML {
+				return template.HTML(b)
+			},
+		}).ParseFiles("./templates/_base.html", "./templates/new.html"))
 		err := templates.ExecuteTemplate(w, "base", nil)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -84,6 +87,16 @@ func editHandler(w http.ResponseWriter, r *http.Request, title string) {
 	renderTemplate(w, "edit", p)
 }
 
+func deleteHandler(w http.ResponseWriter, r *http.Request, title string) {
+	log.Println("delete handler")
+	filename := title + ".txt"
+	e := os.Remove("pages/" + filename)
+	if e != nil {
+		log.Fatal(e)
+	}
+	http.Redirect(w, r, "/", http.StatusFound)
+}
+
 func saveHandler(w http.ResponseWriter, r *http.Request, title string) {
 	body := r.FormValue("body")
 	title = strings.ReplaceAll(title, " ", "_")
@@ -98,7 +111,9 @@ func saveHandler(w http.ResponseWriter, r *http.Request, title string) {
 
 func makeHandler(fn func(http.ResponseWriter, *http.Request, string)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		log.Println("makehandler " + r.URL.Path)
 		m := validPath.FindStringSubmatch(r.URL.Path)
+		log.Println(m)
 		if m == nil {
 			http.NotFound(w, r)
 			return
@@ -129,10 +144,11 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	templates := template.Must(template.ParseFiles(
-		"./templates/_base.tmpl",
-		"./templates/home.tmpl",
-	))
+	var templates = template.Must(template.New("home").Funcs(template.FuncMap{
+		"safeHTML": func(b []byte) template.HTML {
+			return template.HTML(b)
+		},
+	}).ParseFiles("./templates/_base.html", "./templates/home.html"))
 	err = templates.ExecuteTemplate(w, "base", data)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -146,6 +162,7 @@ func fileNameWithoutExtSliceNotation(fileName string) string {
 func main() {
 	log.Println("Server started on: http://localhost:8080")
 	http.HandleFunc("/", homeHandler)
+	http.HandleFunc("/delete/", makeHandler(deleteHandler))
 	http.HandleFunc("/view/", makeHandler(viewHandler))
 	http.HandleFunc("/new", newHandler)
 	http.HandleFunc("/edit/", makeHandler(editHandler))

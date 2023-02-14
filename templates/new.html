@@ -1,0 +1,42 @@
+{{define "title"}}New{{end}}
+
+{{define "main"}}
+    <style>
+        .ck-editor__editable_inline {
+            min-height: 500px;
+        }
+        .ck-editor__editable_inline h1, .ck-editor__editable_inline h2, .ck-editor__editable_inline h3, .ck-editor__editable_inline h4,
+        .ck-editor__editable_inline h5, .ck-editor__editable_inline h6, .ck-editor__editable_inline p
+        {
+            color: #000 !important;
+        }
+    </style>
+    <h1>New page</h1>
+
+    <form action="/new" method="POST">
+        <div class="my-3">
+            <input type="text" name="title" class="form-control" required>
+        </div>
+        <div class="my-3">
+            <textarea id="editor" class="form-control" name="body" rows="20" cols="80"></textarea>
+        </div>
+        <div class="my-3 text-end">
+            <input type="submit" value="Save" class="btn btn-success">
+        </div>
+    </form>
+
+
+    <script src="https://cdn.ckeditor.com/ckeditor5/36.0.1/classic/ckeditor.js"></script>
+    <script>
+        ClassicEditor
+            .create(document.querySelector('#editor'), {
+                height: 500
+            })
+            .then(editor => {
+                console.log(editor);
+            })
+            .catch(error => {
+                console.error(error);
+            });
+    </script>
+{{end}}

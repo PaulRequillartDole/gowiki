@@ -6,5 +6,5 @@
 
     <p>[<a href="/edit/{{.Title}}">edit</a>]</p>
 
-    <div>{{printf "%s" .Body}}</div>
+    <div>{{ .Body | safeHTML }}</div>
 {{end}}
