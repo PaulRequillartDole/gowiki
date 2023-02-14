@@ -1,16 +1,16 @@
 package main
 
 import (
-	"errors"
 	"html/template"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 )
 
-var validPath = regexp.MustCompile("^/(edit|save|view)/([a-zA-Z0-9]+)$")
+var validPath = regexp.MustCompile("^/(edit|save|view)/([a-zA-Z0-9-_]+)$")
 
 type Page struct {
 	Title string
@@ -31,37 +31,14 @@ func loadPage(title string) (*Page, error) {
 	return &Page{Title: title, Body: body}, nil
 }
 
-func getTitle(w http.ResponseWriter, r *http.Request) (string, error) {
-	m := validPath.FindStringSubmatch(r.URL.Path)
-	if m == nil {
-		http.NotFound(w, r)
-		return "", errors.New("invalid Page Title")
-	}
-	return m[2], nil // The title is the second subexpression.
-}
-
 func renderTemplate(w http.ResponseWriter, tmpl string, p *Page) {
-	files := []string{
-		"./base.tmpl",
-		"./" + tmpl + ".tmpl",
-	}
-
-	// Use the template.ParseFiles() function to read the files and store the
-	// templates in a template set. Notice that we can pass the slice of file
-	// paths as a variadic parameter?
-	ts, err := template.ParseFiles(files...)
+	templates := template.Must(template.ParseFiles(
+		"./templates/_base.tmpl",
+		"./templates/"+tmpl+".tmpl",
+	))
+	err := templates.ExecuteTemplate(w, "base", p)
 	if err != nil {
-		log.Print(err.Error())
-		http.Error(w, "Internal Server Error", 500)
-		return
-	}
-
-	// Use the ExecuteTemplate() method to write the content of the "base"
-	// template as the response body.
-	err = ts.ExecuteTemplate(w, "base", p)
-	if err != nil {
-		log.Print(err.Error())
-		http.Error(w, "Internal Server Error", 500)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
@@ -75,6 +52,30 @@ func viewHandler(w http.ResponseWriter, r *http.Request, title string) {
 	renderTemplate(w, "view", p)
 }
 
+func newHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "GET" {
+		templates := template.Must(template.ParseFiles(
+			"./templates/_base.tmpl",
+			"./templates/new.tmpl",
+		))
+		err := templates.ExecuteTemplate(w, "base", nil)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	} else {
+		title := r.FormValue("title")
+		title = strings.ReplaceAll(title, " ", "_")
+		body := r.FormValue("body")
+		p := &Page{Title: title, Body: []byte(body)}
+		err := p.save()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		http.Redirect(w, r, "/view/"+title, http.StatusFound)
+	}
+}
+
 func editHandler(w http.ResponseWriter, r *http.Request, title string) {
 	p, err := loadPage(title)
 	if err != nil {
@@ -85,6 +86,7 @@ func editHandler(w http.ResponseWriter, r *http.Request, title string) {
 
 func saveHandler(w http.ResponseWriter, r *http.Request, title string) {
 	body := r.FormValue("body")
+	title = strings.ReplaceAll(title, " ", "_")
 	p := &Page{Title: title, Body: []byte(body)}
 	err := p.save()
 	if err != nil {
@@ -106,9 +108,7 @@ func makeHandler(fn func(http.ResponseWriter, *http.Request, string)) http.Handl
 }
 
 func homeHandler(w http.ResponseWriter, r *http.Request) {
-
-	pwd, _ := os.Getwd()
-	f, err := os.Open(pwd + "/pages")
+	f, err := os.Open("./pages")
 	if err != nil {
 		return
 	}
@@ -129,30 +129,13 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Initialize a slice containing the paths to the two files. It's important
-	// to note that the file containing our base template must be the *first*
-	// file in the slice.
-	tmpl := []string{
-		"./base.tmpl",
-		"./home.tmpl",
-	}
-
-	// Use the template.ParseFiles() function to read the files and store the
-	// templates in a template set. Notice that we can pass the slice of file
-	// paths as a variadic parameter?
-	ts, err := template.ParseFiles(tmpl...)
+	templates := template.Must(template.ParseFiles(
+		"./templates/_base.tmpl",
+		"./templates/home.tmpl",
+	))
+	err = templates.ExecuteTemplate(w, "base", data)
 	if err != nil {
-		log.Print(err.Error())
-		http.Error(w, "Internal Server Error", 500)
-		return
-	}
-
-	// Use the ExecuteTemplate() method to write the content of the "base"
-	// template as the response body.
-	err = ts.ExecuteTemplate(w, "base", data)
-	if err != nil {
-		log.Print(err.Error())
-		http.Error(w, "Internal Server Error", 500)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
@@ -161,8 +144,10 @@ func fileNameWithoutExtSliceNotation(fileName string) string {
 }
 
 func main() {
+	log.Println("Server started on: http://localhost:8080")
 	http.HandleFunc("/", homeHandler)
 	http.HandleFunc("/view/", makeHandler(viewHandler))
+	http.HandleFunc("/new", newHandler)
 	http.HandleFunc("/edit/", makeHandler(editHandler))
 	http.HandleFunc("/save/", makeHandler(saveHandler))
 
