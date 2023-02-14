@@ -88,7 +88,6 @@ func editHandler(w http.ResponseWriter, r *http.Request, title string) {
 }
 
 func deleteHandler(w http.ResponseWriter, r *http.Request, title string) {
-	log.Println("delete handler")
 	filename := title + ".txt"
 	e := os.Remove("pages/" + filename)
 	if e != nil {
@@ -111,9 +110,7 @@ func saveHandler(w http.ResponseWriter, r *http.Request, title string) {
 
 func makeHandler(fn func(http.ResponseWriter, *http.Request, string)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log.Println("makehandler " + r.URL.Path)
 		m := validPath.FindStringSubmatch(r.URL.Path)
-		log.Println(m)
 		if m == nil {
 			http.NotFound(w, r)
 			return
@@ -123,18 +120,11 @@ func makeHandler(fn func(http.ResponseWriter, *http.Request, string)) http.Handl
 }
 
 func homeHandler(w http.ResponseWriter, r *http.Request) {
-	f, err := os.Open("./pages")
-	if err != nil {
-		return
-	}
-	files, err := f.Readdir(0)
-	if err != nil {
-		return
-	}
+	files := checkExt(".txt")
 
 	var data []*Page
 	for _, v := range files {
-		title := fileNameWithoutExtSliceNotation(v.Name())
+		title := fileNameWithoutExtSliceNotation(v)
 		p, _ := loadPage(title)
 		data = append(data, p)
 	}
@@ -149,7 +139,7 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 			return template.HTML(b)
 		},
 	}).ParseFiles("./templates/_base.html", "./templates/home.html"))
-	err = templates.ExecuteTemplate(w, "base", data)
+	err := templates.ExecuteTemplate(w, "base", data)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -157,6 +147,27 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 
 func fileNameWithoutExtSliceNotation(fileName string) string {
 	return fileName[:len(fileName)-len(filepath.Ext(fileName))]
+}
+
+func checkExt(ext string) []string {
+	pathS, err := os.Getwd()
+	if err != nil {
+		panic(err)
+	}
+	var files []string
+	err = filepath.Walk(pathS, func(path string, f os.FileInfo, _ error) error {
+		if !f.IsDir() {
+			r, err := regexp.MatchString(ext, f.Name())
+			if err == nil && r {
+				files = append(files, f.Name())
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil
+	}
+	return files
 }
 
 func main() {

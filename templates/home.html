@@ -6,10 +6,7 @@
             <div class="col-12 col-md-6">
                 <div class="card h-100">
                     <div class="card-header">
-                        <div class="d-flex align-items-center justify-content-between">
-                            <a href="/view/{{ .Title }}">view {{ .Title }}</a>
-                            <a href="/delete/{{ .Title }}">delete</a>
-                        </div>
+                        <h3 class="mb-0 card-title text-capitalize"><a href="/view/{{ .Title }}">{{ .Title }}</a></h3>
                     </div>
                     <div class="card-body">
                         {{ .Body | safeHTML }}

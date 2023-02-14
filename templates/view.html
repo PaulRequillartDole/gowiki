@@ -2,9 +2,17 @@
 {{define "title"}}View{{end}}
 
 {{define "main"}}
-    <h1>{{.Title}}</h1>
-
-    <p>[<a href="/edit/{{.Title}}">edit</a>]</p>
-
-    <div>{{ .Body | safeHTML }}</div>
+    <div class="d-flex justify-content-between align-items-center">
+        <h1 class="mb-0 text-capitalize">{{.Title}}</h1>
+        <div>
+            <a class="btn btn-primary" href="/edit/{{.Title}}">Edit</a>
+            <a class="btn btn-danger" href="/delete/{{ .Title }}">Delete</a>
+        </div>
+    </div>
+    <div class="card my-3">
+        <div class="card-body">
+            {{ .Body | safeHTML }}
+        </div>
+    </div>
+    <a class="btn btn-light" href="/">Back</a>
 {{end}}
